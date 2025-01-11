@@ -13,4 +13,4 @@ class Role(Base):
     is_active = Column(Boolean)
 
     # Relasi ke User
-    User = relationship("User", back_populates="role")  # String "User" digunakan
+    users = relationship('User', back_populates='role', cascade='save-update')

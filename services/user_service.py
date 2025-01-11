@@ -1,4 +1,5 @@
 import os
+import uuid
 import bcrypt
 import pandas as pd
 from fastapi import HTTPException, UploadFile, status
@@ -14,7 +15,8 @@ class UserService:
     def __init__(self, db: Session):
         self.db = db
         self.user_repository = UserRepository(db)
-
+        self.static_folder_image = "static/images/user/image"
+        
     def get_password_hash(self, password: str) -> str:
         pwd_bytes = password.encode('utf-8')
         salt = bcrypt.gensalt()
@@ -26,8 +28,18 @@ class UserService:
         hashed_password_byte_enc = hashed_password.encode('utf-8')
         return bcrypt.checkpw(password=password_byte_enc, hashed_password=hashed_password_byte_enc)
     
-    def create_user(self, user: User,):
-        return self.user_repository.create_user(user)
+    def create_user(self, user: User, image: UploadFile = None, file_extension=None):
+        # Proses upload gambar jika ada
+        user.image_url = upload_file(image, self.static_folder_image, file_extension, user.username) if image else ''
+
+        # Menambahkan pengguna ke database
+        user.is_active = True
+        user.id = str(uuid.uuid4())        
+        self.db.add(user)
+        self.db.commit()  # Commit perubahan ke database
+        self.db.refresh(user)  # Refresh objek untuk mendapatkan id yang di-generate oleh DB
+
+        return user  # Mengembalikan objek user yang sudah disimpan
     
     def validation_unique_based_other_user(self, exist_user: User, user: User):
         if user.username:

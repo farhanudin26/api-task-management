@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         'roles',
-        sa.Column('id', sa.String(36), primary_key=True, server_default=str(uuid.uuid4())),
+        sa.Column('id', sa.String(36), primary_key=True),
         sa.Column('code', sa.String(36), unique=True, nullable=False),
         sa.Column('level', sa.Integer, nullable=False),
         sa.Column('name', sa.String(126), unique=True, nullable=False),

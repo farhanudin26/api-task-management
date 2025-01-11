@@ -3,17 +3,17 @@ import uuid
 from fastapi import APIRouter, Depends, Form, Query, Request, UploadFile, status, HTTPException, File
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from constant import UserGender
 from database import get_db
 from models.response import GeneralDataPaginateResponse, GeneralDataResponse
 from models.user import User
-# from services.role_service import RoleService
+from services.role_service import RoleService
 from services.user_service import UserService
 # from utils.authentication import Authentication
 # from utils.generate_sensitive import encrypt_value
 from utils.authentication import Authentication
 from utils.handling_file import validation_file
 from utils.manual import get_total_pages
-# from constant import Valid_Bank_Names, CategoryEmployee, UserGender, Education
 
 router = APIRouter()
 
@@ -23,10 +23,11 @@ async def create_user(
     username: str = Form(..., min_length=1, max_length=36),
     email: str = Form(..., min_length=1, max_length=225),
     password: str = Form(..., min_length=1, max_length=512),
-    project_id: str = Form(None, min_length=1, max_length=36),
-
+    name: str = Form(..., min_length=1, max_length=225),
+    gender: UserGender = Form(...),    
+    image: UploadFile = None,
     db: Session = Depends(get_db), 
-    payload = Depends(Authentication())
+    # payload = Depends(Authentication())
 ):  
     """
         Create User
@@ -37,22 +38,22 @@ async def create_user(
         - only admin and leader
     """
     # service
-    # role_service = RoleService(db)
+    role_service = RoleService(db)
     user_service = UserService(db)
 
     # cek role user
-    user_id_active = payload.get("uid", None)
-    user_active = user_service.user_repository.read_user(user_id_active)
-    if not user_active or user_active.role.code not in ['ADM', 'CLN']:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Anda Tidak Memiliki Hak Akses"
-        )
+    # user_id_active = payload.get("uid", None)
+    # user_active = user_service.user_repository.read_user(user_id_active)
+    # if not user_active or user_active.role.code not in ['ADM', 'USER']:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="Anda Tidak Memiliki Hak Akses"
+    #     )
     
     # validation
-    # exist_role_id = role_service.role_repository.read_role(role_id)
-    # if not exist_role_id:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+    exist_role_id = role_service.role_repository.read_role(role_id)
+    if not exist_role_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
     
     exist_username = user_service.user_repository.get_user_by_username(username)
     if exist_username:
@@ -62,32 +63,26 @@ async def create_user(
     if exist_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exist")
     
-    # Validasi project_id berdasarkan role
-    if user_active.role.code == 'ADM':
-        if not project_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Project ID tidak boleh kosong untuk pengguna dengan role ADM"
-            )
-    elif user_active.role.code == 'CLN':
-        project_id = user_active.project_id
-        if not project_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Project ID tidak ditemukan untuk pengguna aktif"
-            )
     try:
+        if (image):
+            await validation_file(file=image)
 
+        content_type = image.content_type if image else ""
+        file_extension = content_type.split('/')[1] if image else ""
+        
         user_model = User(
             role_id=role_id,
             username=username,
             email=email,
             password=user_service.get_password_hash(password),
-            project_id=project_id
+            name=name,
+            gender=gender.value,            
         )
 
         data = user_service.create_user(
             user_model,
+            image,
+            file_extension,            
         )
 
     except ValueError as error:
@@ -142,16 +137,11 @@ def read_users(
     user_id_active = payload.get("uid", None)
     user_service = UserService(db)
     user_active = user_service.user_repository.read_user(user_id_active)
-    if not user_active or user_active.role.code not in ['ADM', 'CLN',]:
+    if not user_active or user_active.role.code not in ['ADM', 'USER',]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Anda Tidak Memiliki Hak Akses")
 
     base_url = str(request.base_url) if request else ""
     custom_filters = {filter_by_column: filter_value} if filter_by_column and filter_value else None
-    
-    if user_active.role.code == 'CLN':
-        if not custom_filters:
-            custom_filters = {}
-        custom_filters['project_id'] = user_active.project_id
     
     if user_id:
         custom_filters = custom_filters or {}
@@ -238,8 +228,8 @@ def read_user(
     user_id_active = payload.get("uid", None)
     user_service = UserService(db)
     user = user_service.user_repository.read_user(user_id_active)
-    if not user or user.role.code not in ['ADM', 'CLN',]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Anda Tidak Memiliki Hak Akses")
+    # if not user or user.role.code not in ['ADM', 'USER',]:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Anda Tidak Memiliki Hak Akses")
 
     user_service = UserService(db)
     base_url = str(request.base_url) if request else ""
@@ -262,7 +252,6 @@ def read_user(
             'id': user.id,
             'username': user.username,
             'email': user.email,
-            'project_id': user.project_id,
             'role': role,
             'is_active': user.is_active,
             'created_at': str(user.created_at),

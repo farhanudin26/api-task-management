@@ -16,8 +16,8 @@ router = APIRouter()
 
 def check_admin(user_service: UserService, user_id: str):
     user = user_service.user_repository.read_user(user_id)
-    if not user or user.role.code != 'ADM':
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can perform this action")
+    # if not user or user.role.code != 'ADM':
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can perform this action")
 
 @router.post("", response_model=GeneralDataResponse, status_code=status.HTTP_201_CREATED)
 async def create_role(
