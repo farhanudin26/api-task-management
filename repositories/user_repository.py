@@ -42,6 +42,15 @@ class UserRepository:
         self.db.commit()
         self.db.refresh(user)
         return user
+    def register(self, user: User):
+        if user.is_active is None:
+            user.is_active = True
+        user.role_id = "USER"            
+        user.id = str(uuid.uuid4())
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
 
     def get_user_by_username(self, username: str) -> User:
         return self.db.query(User).filter(User.username == username).first()

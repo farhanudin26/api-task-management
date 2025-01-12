@@ -41,6 +41,17 @@ class UserService:
 
         return user  # Mengembalikan objek user yang sudah disimpan
     
+    def register(self, user: User,):
+        # Menambahkan pengguna ke database
+        user.role_id = "USER"
+        user.is_active = True
+        user.id = str(uuid.uuid4())        
+        self.db.add(user)
+        self.db.commit()  # Commit perubahan ke database
+        self.db.refresh(user)  # Refresh objek untuk mendapatkan id yang di-generate oleh DB
+
+        return user  # Mengembalikan objek user yang sudah disimpan    
+    
     def validation_unique_based_other_user(self, exist_user: User, user: User):
         if user.username:
             exist_username = self.user_repository.get_user_by_username(user.username)

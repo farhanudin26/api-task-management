@@ -8,6 +8,7 @@ from dtos.auth import AuthLogin, AuthProfilePassword, EmailSchema, ResetPassword
 from models.response import AuthResponse, GeneralDataResponse
 from models.user import User
 from services.auth_service import AuthService
+from services.role_service import RoleService
 from services.user_service import UserService
 from utils.authentication import Authentication
 from utils.handling_file import validation_file
@@ -233,11 +234,10 @@ async def auth_update_profile(
 
 @router.post("/register", response_model=GeneralDataResponse, status_code=status.HTTP_201_CREATED)
 async def register(
-    role_id: str = Form(...),
     username: str = Form(..., min_length=1, max_length=36),
-    name: str = Form(..., min_length=1, max_length=225),
     email: str = Form(..., min_length=1, max_length=225),
     password: str = Form(..., min_length=1, max_length=512),
+    name: str = Form(..., min_length=1, max_length=225),
     db: Session = Depends(get_db), 
 ):  
     """
@@ -249,23 +249,10 @@ async def register(
         - only admin and leader
     """
     # service
-    # role_service = RoleService(db)
+    role_service = RoleService(db)
     user_service = UserService(db)
-
-    # cek role user
-    # user_id_active = payload.get("uid", None)
-    # user_active = user_service.user_repository.read_user(user_id_active)
-    # if not user_active or user_active.role.code not in ['ADM', 'CLN']:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="Anda Tidak Memiliki Hak Akses"
-    #     )
     
     # validation
-    # exist_role_id = role_service.role_repository.read_role(role_id)
-    # if not exist_role_id:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
-    
     exist_username = user_service.user_repository.get_user_by_username(username)
     if exist_username:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exist")
@@ -275,18 +262,17 @@ async def register(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exist")
     
     try:
-
+    
         user_model = User(
-            role_id=role_id,
             username=username,
-            name=name,
             email=email,
             password=user_service.get_password_hash(password),
-
+            name=name,
+            role_id = "USER"
         )
 
         data = user_service.create_user(
-            user_model,
+            user_model,           
         )
 
     except ValueError as error:
@@ -304,6 +290,7 @@ async def register(
     )
     response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
     return response
+
 
 # @router.get("/check_confirmation_user", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
 # def check_confirmation_user(

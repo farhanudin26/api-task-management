@@ -19,63 +19,63 @@ def check_admin(user_service: UserService, user_id: str):
     # if not user or user.role.code != 'ADM':
     #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can perform this action")
 
-@router.post("", response_model=GeneralDataResponse, status_code=status.HTTP_201_CREATED)
-async def create_role(
-    data: CreateRole,
-    db: Session = Depends(get_db), 
-    # payload = Depends(Authentication())
-):
-    """
-        Create Role
+# @router.post("", response_model=GeneralDataResponse, status_code=status.HTTP_201_CREATED)
+# async def create_role(
+#     data: CreateRole,
+#     db: Session = Depends(get_db), 
+#     # payload = Depends(Authentication())
+# ):
+#     """
+#         Create Role
 
-        - should login
-        - only admin
-    """
-    # user_id = payload.get("uid", None)
+#         - should login
+#         - only admin
+#     """
+#     # user_id = payload.get("uid", None)
 
-    # service
-    user_service = UserService(db)
-    role_service = RoleService(db)
+#     # service
+#     user_service = UserService(db)
+#     role_service = RoleService(db)
     
-    # check_admin(user_service)
+#     # check_admin(user_service)
     
-    exist_code = role_service.role_repository.get_role_by_code(data.code)
-    if exist_code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code already exist")
+#     exist_code = role_service.role_repository.get_role_by_code(data.code)
+#     if exist_code:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code already exist")
     
-    exist_name = role_service.role_repository.get_role_by_name(data.name)
-    if exist_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name already exist")
+#     exist_name = role_service.role_repository.get_role_by_name(data.name)
+#     if exist_name:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name already exist")
     
-    exist_id = role_service.role_repository.read_role(data.role_id)
-    if exist_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Id already exist")
+#     exist_id = role_service.role_repository.read_role(data.role_id)
+#     if exist_id:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Id already exist")
     
-    try:
-        role_model = Role(
-            id=data.role_id,
-            code=data.code,
-            level=data.level,
-            name=data.name,
-            description=data.description,
-        )
+#     try:
+#         role_model = Role(
+#             id=data.role_id,
+#             code=data.code,
+#             level=data.level,
+#             name=data.name,
+#             description=data.description,
+#         )
 
-        data = role_service.role_repository.create_role(role_model)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+#         data = role_service.role_repository.create_role(role_model)
+#     except ValueError as error:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
     
-    status_code = status.HTTP_201_CREATED
-    data = {
-        'id': data.id,
-    }
+#     status_code = status.HTTP_201_CREATED
+#     data = {
+#         'id': data.id,
+#     }
 
-    data_response = GeneralDataResponse(
-        code=status_code,
-        status="OK",
-        data=data,
-    )
-    response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
-    return response
+#     data_response = GeneralDataResponse(
+#         code=status_code,
+#         status="OK",
+#         data=data,
+#     )
+#     response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
+#     return response
 
 @router.get("", response_model=GeneralDataPaginateResponse, status_code=status.HTTP_200_OK)
 def read_roles(
