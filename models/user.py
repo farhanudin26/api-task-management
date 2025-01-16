@@ -22,5 +22,7 @@ class User(Base):
 
     # Relasi ke Role
     role = relationship('Role', back_populates='users')
+    task_managements = relationship("TaskManagement", back_populates="user")
+
     # diary = relationship('Diary', back_populates='users')
     # task_management = relationship('TaskManagement', back_populates='users')

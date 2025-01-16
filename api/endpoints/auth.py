@@ -92,22 +92,11 @@ def auth_profile(
     
     status_code = status.HTTP_200_OK
 
-    role_data = {
-        'id': user.role.id,
-        'code': user.role.code,
-        'name': user.role.name,
-    } if user.role else {}
-    
-    project_data = {
-        'id': user.project_id,
-    } if user else {}
-
     data = {
         'id': user.id,
         'username': user.username,
         'email': user.email,
-        'role': role_data,
-        'project': project_data,
+        'name': user.name,
     }
 
     auth_response = AuthResponse(

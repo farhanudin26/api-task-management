@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column('task_management', sa.String(256), unique=False, nullable=True),
         sa.Column('description', sa.String(256), unique=False, nullable=True),
         sa.Column('date', sa.DateTime, nullable=False),
+        sa.Column('priority', sa.Boolean, nullable=False, default=False),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.NOW(), nullable=False),
         sa.Column('updated_at', sa.DateTime, server_default=sa.func.NOW(), onupdate=sa.func.NOW(), nullable=False),
         sa.Column('deleted_at', sa.DateTime, nullable=True),
