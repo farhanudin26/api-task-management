@@ -66,360 +66,249 @@ def create_task_management(
     )
     return data_response
 
-# @router.get("", response_model=GeneralDataPaginateResponse, status_code=status.HTTP_200_OK)
-# def read_tasks(
-#     assign_at: Optional[date] = Query(None),
-#     sort_by: Optional[str] = Query(None),
-#     sort_order: Optional[str] = Query(None),
-#     filter_by_column: Optional[str] = Query(None),
-#     filter_value: Optional[str] = Query(None),
-#     project_id: Optional[str] = Query(None),
-#     user_id: Optional[str] = Query(None),
-#     year: Optional[int] = Query(None),
-#     month: Optional[int] = Query(None),
-#     day: Optional[int] = Query(None),
-#     offset: Optional[int] = Query(None, ge=1), 
-#     size: Optional[int] = Query(None, ge=1),
-#     include_subordinates: bool = Query(False),
-#     db: Session = Depends(get_db), 
-#     payload = Depends(Authentication())
-# ):
-#     """
-#     Read All Tasks or Task by Date
+@router.get("", response_model=GeneralDataPaginateResponse, status_code=status.HTTP_200_OK)
+def read_tasks(
+    date: Optional[date] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None),
+    task_management_id: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    offset: Optional[int] = Query(1, ge=1), 
+    size: Optional[int] = Query(10, ge=1),  # Default size set to 10
+    db: Session = Depends(get_db), 
+    payload = Depends(Authentication())
+):
+    """
+    Read All Tasks or Task by Date
 
-#     - need login
-#     """
-#     user_id_active = payload.get("uid", None)
-#     user_role = payload.get("role", None)
+    - need login
+    """
+    user_id_active = payload.get("uid", None)
+    user_role = payload.get("role", None)
 
-#     # Services
-#     task_service = TaskManagementService(db)
-#     user_service = UserService(db)
+    # Services
+    task_management_service = TaskManagementService(db)
+    user_service = UserService(db)
 
-#     custom_filters = {filter_by_column: filter_value} if filter_by_column and filter_value else {}
-#     user_active = user_service.user_repository.read_user(user_id_active)
-
-#     if user_active.role.code == 'EMPLOYEE':
-#         custom_filters['user_id'] = user_id_active
-#     elif user_active.role.code == 'LEAD':
-#         subordinate_ids = user_service.get_subordinates(user_id_active)
-#         if include_subordinates:
-#             custom_filters['user_id'] = {'$in': [user_id_active] + subordinate_ids}
-#         else:
-#             custom_filters['user_id'] = user_id_active
-#     elif user_active.role.code == 'ADM':
-#         if include_subordinates:
-#             custom_filters.pop('user_id', None)  # Admin can see all tasks
-#         else:
-#             custom_filters['user_id'] = user_id_active
-#     else:
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to view data")
+    # Validasi user aktif
+    user_active = user_service.user_repository.read_user(user_id_active)
     
-#     # Fetch tasks based on the filters and date
-#     tasks = task_service.read_tasks(
-#         sort_by=sort_by,
-#         sort_order=sort_order,
-#         custom_filters=custom_filters,
-#         offset=offset,
-#         size=size,
-#         project_id=project_id,
-#         user_id=user_id,
-#         year=year,
-#         month=month,
-#         day=day,
-#     )  
+    # Fetch tasks based on the filters and date, but only tasks owned by the current user
+    task_managements = task_management_service.task_management_repository.read_task_managements(
+        sort_by=sort_by,
+        sort_order=sort_order,
+        offset=offset,
+        size=size,
+        user_id=user_id_active,
+        task_management_id=task_management_id
+    )  
 
-#     if not tasks:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data not found")
+    if not task_managements:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data not found")
 
-#     # Prepare data for the response
-#     datas = []
-#     for task in tasks:
-#         user = {
-#             'id': task.user.id,
-#             'name': task.user.name,
-#         } if task.user else {}
-#         project = {
-#             'id': task.project.id,
-#             'title': task.project.title,
-#             'category': task.project.category,
-#         } if task.project else {}
-#         datas.append({
-#             'id': task.id,
-#             'user': user,
-#             'project': project,
-#             'title': task.title,
-#             'description': task.description,
-#             'total_hour': round(task.total_hour, 2),
-#             'assign_at': str(task.assign_at),
-#             'created_at': str(task.created_at),
-#             'updated_at': str(task.updated_at),
-#         })
+    # Prepare data for the response
+    datas = []
+    for task in task_managements:
+        datas.append({
+            'id': task.id,  # Correct the task reference
+            'user': task.user.name,  # Accessing the correct task object
+            'task_management': task.task_management,
+            'description': task.description,            
+            'priority': task.priority,
+            'date': task.date.strftime('%Y-%m-%d') if task.date else None,            
+            'created_at': str(task.created_at),
+            'updated_at': str(task.updated_at),
+        })
 
-#     # Prepare metadata
-#     meta = {}
+    # Prepare metadata
+    count = task_management_service.task_management_repository.count_task_managements(
+        user_id=user_id_active,task_management_id=task_management_id  
+    )
+
+    total_pages = get_total_pages(size, count)
+    meta = {
+        "size": size,
+        "total": count,
+        "total_pages": total_pages,
+        "offset": offset,
+    }
     
-#     count = task_service.task_repository.count_tasks(
-#         custom_filters=custom_filters,
-#         project_id=project_id,
-#         user_id=user_id,
-#         year=year,
-#         month=month,
-#         day=day,
-#     )
+    # Prepare response
+    status_code = status.HTTP_200_OK
+    data_response = GeneralDataPaginateResponse(
+        code=status_code,
+        status="OK",
+        data=datas,
+        meta=meta,
+    )
+    return data_response  # No need for JSONResponse here, FastAPI handles it automatically
 
-#     total_pages = get_total_pages(size, count)
-#     meta = {
-#         "size": size,
-#         "total": count,
-#         "total_pages": total_pages,
-#         "offset": offset,
-#         "start_date": '',
-#         "end_date": '',
-#     }
 
-#     # Add start and end date to meta if year and month are provided
-#     if year and month:
-#         period = task_service.task_repository.get_period_by_year_and_month(year, month)
-#         if period:
-#             meta["start_date"] = str(period.start_at)
-#             meta["end_date"] = str(period.end_at)
+@router.get("/{task_management_id}", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
+def read_task_management(
+    task_management_id: str,
+    db: Session = Depends(get_db), 
+    payload: dict = Depends(Authentication())
+):
+    """
+    Read Task Management Detail.
 
-#     # Prepare response
-#     status_code = status.HTTP_200_OK
-#     data_response = GeneralDataPaginateResponse(
-#         code=status_code,
-#         status="OK",
-#         data=datas,
-#         meta=meta,
-#     )
-#     response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
-#     return response
+    - Authentication required.
+    """
+    # Ambil user ID aktif dari payload
+    user_id_active = payload.get("uid")
+    if not user_id_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not authenticated")
 
-# @router.get("/{task_id}", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
-# def read_task(
-#     task_id: int,
-#     db: Session = Depends(get_db), 
-#     payload = Depends(Authentication())
-# ):
-#     """
-#         Read Task
+    # Inisialisasi service
+    user_service = UserService(db)
+    task_management_service = TaskManagementService(db)
 
-#         - should login
+    # Validasi user aktif
+    user_active = user_service.user_repository.read_user(user_id_active)
+    if not user_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-#     """
-#     user_id_active = payload.get("uid", None)
 
-#     # service
-#     user_service = UserService(db)
-#     task_service = TaskService(db)
+    # Ambil data task management berdasarkan ID
+    task_management = task_management_service.task_management_repository.read_task_management(task_management_id)
+    if not task_management:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task management data not found")
     
-#     user_active = user_service.user_repository.read_user(user_id_active)
+    # Validasi apakah task yang akan dihapus milik user yang sedang login
+    if task_management.user_id != user_id_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tidak dapat melihat task milik orang lain")
 
-#     task = task_service.task_repository.read_task(task_id)
+    # Bangun respons untuk user terkait task management
+    user = {
+        'id': task_management.user.id,
+        'name': task_management.user.name,
+    } if task_management.user else {}
 
-#     if not task:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data not found")
+    # Format respons umum
+    data_response = GeneralDataResponse(
+        code=status.HTTP_200_OK,
+        status="OK",
+        data={
+            'id': task_management.id,
+            'user': user,
+            'task_management': task_management.task_management,
+            'description': task_management.description,
+            'date': task_management.date,
+            'priority': task_management.priority,
+            'created_at': task_management.created_at.isoformat(),
+            'updated_at': task_management.updated_at.isoformat(),
+        },
+    )
     
+    return data_response  
+
+@router.patch("/{task_management_id}", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
+async def update_task(
+    task_management_id: str,
+    task_management: str = Form(..., min_length=1, max_length=256),
+    description: str = Form(None, min_length=0, max_length=512),    
+    date: date = Form(...),
+    priority: bool = Form(...),
+    db: Session = Depends(get_db), 
+    payload = Depends(Authentication())
+):
+    """
+    Update Task
+
+    - should login
+    """
+    user_id_active = payload.get("uid", None)
+
+    if not user_id_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not authenticated")
+
+    user_service = UserService(db)
+    task_management_service = TaskManagementService(db)
+
+    user_active = user_service.user_repository.read_user(user_id_active)
+
+    if not user_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-#     user = {
-#         'id': task.user.id,
-#         'name': task.user.name,
-#     } if task.user else {}
-#     project = {
-#         'id': task.project.id,
-#         'title': task.project.title,
-#         'category': task.project.category,
-#     } if task.project else {}
-
-#     status_code = status.HTTP_200_OK
-#     data_response = GeneralDataResponse(
-#         code=status_code,
-#         status="OK",
-#         data={
-#             'id': task.id,
-#             'user': user,
-#             'project': project,
-#             'title': task.title,
-#             'description': task.description,
-#             'total_hour': task.total_hour,
-#             'assign_at': str(task.assign_at),
-#             'created_at': str(task.created_at),
-#             'updated_at': str(task.updated_at),
-#         },
-#     )
-#     response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
-#     return response
-
-# @router.patch("/{task_id}", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
-# async def update_task(
-#     task_id: int,
-#     project_id: str = Form(None, min_length=1, max_length=36),
-#     title: str = Form(..., min_length=1, max_length=256),
-#     assign_at: date = Form(...),
-#     total_hour: float = Form(...),
-#     description: str = Form(None, min_length=0, max_length=512),
-#     db: Session = Depends(get_db), 
-#     payload = Depends(Authentication())
-# ):
-#     """
-#     Update Task
-
-#     - should login
-#     """
-#     user_id_active = payload.get("uid", None)
-
-#     user_service = UserService(db)
-#     project_service = ProjectService(db)
-#     task_service = TaskService(db)
-#     permission_service = PermissionService(db)
-#     paid_leave_service = PaidLeaveService(db)
+    # Cari task berdasarkan ID
+    exist_task = task_management_service.task_management_repository.read_task_management(task_management_id)
+    if not exist_task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     
-#     user_active = user_service.user_repository.read_user(user_id_active)
+    try:
+        # Perbarui data task
+        updated_task_management = TaskManagement(
+            id=task_management_id,  # Pastikan ID yang sesuai digunakan
+            task_management=task_management,
+            description=description,
+            date=date,
+            priority=priority,
+        )
 
-#     exist_task = task_service.task_repository.read_task(task_id)
-#     if not exist_task:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    
-#     exist_project = project_service.project_repository.read_project(project_id)
-#     if not exist_project:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    
-#     user_task_owner = user_service.user_repository.read_user(exist_task.user_id)
+        # Panggil update_task_management dengan data yang sudah diperbarui
+        updated_task = task_management_service.task_management_repository.update_task_management(updated_task_management)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
-#     if user_active.role.code == 'EMPLOYEE' and user_active.id != exist_task.user_id:
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to update others' task")
-    
-#     if user_active.role.code == 'LEAD':
-#         if user_active.id != exist_task.user_id and not user_service.is_subordinate(exist_task.user_id, user_active.id):
-#             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to update this task")
-    
-#     if user_active.role.code != 'ADM' and user_task_owner.role.code == 'ADM':
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to update admin's task")
-    
-#     if total_hour <= 0:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Total jam harus lebih dari 0"
-#         )
+    status_code = status.HTTP_200_OK
+    data = {
+        'id': updated_task.id,
+    }
 
-#     # Menghitung total jam pada tanggal yang sama (tidak termasuk task saat ini)
-#     total_hours_on_date = task_service.task_repository.sum_total_hour_tasks(
-#         user_id=exist_task.user_id,
-#         assign_at=assign_at
-#     ) - exist_task.total_hour + total_hour
+    data_response = GeneralDataResponse(
+        code=status_code,
+        status="OK",
+        data=data,
+    )
+    response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
+    return response
 
-#     if total_hours_on_date > 24:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Total jam pada tanggal yang sama melebihi 24 jam"
-#         )
 
-#     # Validasi Paid Leave yang tumpang tindih
-#     overlapping_paid_leaves = paid_leave_service.paid_leave_repository.read_paid_leaves_between(
-#         user_id=exist_task.user_id,
-#         start_at=assign_at,
-#         end_at=assign_at,
-#         status=[PaidLeaveStatus.pending.value, PaidLeaveStatus.approved.value]
-#     )
-#     if overlapping_paid_leaves:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Tidak dapat membuat tugas pada tanggal ini karena terdapat Paid Leave yang masih pending atau sudah disetujui"
-#         )
-
-#     # Validasi Permission yang tumpang tindih
-#     overlapping_permissions = permission_service.permission_repository.read_permissions_between(
-#         user_id=exist_task.user_id,
-#         start_at=assign_at,
-#         end_at=assign_at,
-#         status=[PermissionStatus.pending.value, PermissionStatus.approved.value]
-#     )
-#     if overlapping_permissions:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Tidak dapat membuat tugas pada tanggal ini karena terdapat Permission yang masih pending atau sudah disetujui"
-#         )
+@router.delete("/{task_management_id}", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
+async def delete_task(
+    task_management_id: str,
+    db: Session = Depends(get_db), 
+    payload = Depends(Authentication())
+):
+    """
+        Delete Task
         
-#     try:
-#         # Update task data
-#         updated_task = Task(
-#             project_id=project_id,
-#             title=title,
-#             assign_at=assign_at,
-#             total_hour=total_hour,
-#             description=description
-#         )
-#         data = task_service.update_task(
-#             exist_task=exist_task,
-#             task=updated_task
-#         )
-#     except ValueError as error:
-#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+        - harus login
+        - tidak bisa menghapus task milik orang lain
+    """
+    user_id_active = payload.get("uid", None)
 
-#     status_code = status.HTTP_200_OK
-#     data = {
-#         'id': data.id,
-#     }
-
-#     data_response = GeneralDataResponse(
-#         code=status_code,
-#         status="OK",
-#         data=data,
-#     )
-#     response = JSONResponse(content=data_response.model_dump(), status_code=status_code)
-#     return response
-
-# @router.delete("/{task_id}", response_model=GeneralDataResponse, status_code=status.HTTP_200_OK)
-# async def delete_task(
-#     task_id: int,
-#     db: Session = Depends(get_db), 
-#     payload = Depends(Authentication())
-# ):
-#     """
-#         Delete Task
-        
-#         - harus login
-#     """
-#     user_id_active = payload.get("uid", None)
-
-#     user_service = UserService(db)
-#     task_service = TaskService(db)
+    user_service = UserService(db)
+    task_management_service = TaskManagementService(db)
     
-#     user_active = user_service.user_repository.read_user(user_id_active)
-#     exist_task = task_service.task_repository.read_task(task_id)
-
-#     if not exist_task:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task tidak ditemukan")
+    # Cari task yang akan dihapus
+    exist_task = task_management_service.task_management_repository.read_task_management(task_management_id)
+    if not exist_task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task tidak ditemukan")
     
-#     user_task_owner = user_service.user_repository.read_user(exist_task.user_id)
+    # Validasi apakah task yang akan dihapus milik user yang sedang login
+    if exist_task.user_id != user_id_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tidak dapat menghapus task milik orang lain")
 
-#     if user_active.role.code == 'EMPLOYEE' and user_active.id != exist_task.user_id:
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tidak diizinkan untuk menghapus task orang lain")
-    
-#     if user_active.role.code == 'LEAD':
-#         if user_active.id != exist_task.user_id and not user_service.is_subordinate(exist_task.user_id, user_active.id):
-#             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tidak diizinkan untuk menghapus task ini")
-    
-#     if user_active.role.code != 'ADM' and user_task_owner.role.code == 'ADM':
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tidak diizinkan untuk menghapus task admin")
-    
-#     try:
-#         task_service.task_repository.delete_task(exist_task)
-#         db.commit()
-#     except Exception as error:
-#         db.rollback()
-#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+    # Hapus task
+    try:
+        task_management_service.task_management_repository.delete_task_management(task_management_id)
+        # Tidak perlu db.commit() jika commit sudah dilakukan dalam delete_task_management
+    except Exception as error:
+        db.rollback()  # Jika terjadi error, rollback perubahan
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
-#     status_code = status.HTTP_200_OK
-#     data = {
-#         'id': task_id,
-#     }
+    # Persiapkan respons
+    status_code = status.HTTP_200_OK
+    data = {
+        'id': task_management_id,
+    }
 
-#     data_response = GeneralDataResponse(
-#         code=status_code,
-#         status="OK",
-#         data=data,
-#     )
-#     response = JSONResponse(content=data_response.dict(), status_code=status_code)
-#     return response
+    data_response = GeneralDataResponse(
+        code=status_code,
+        status="OK",
+        data=data,
+    )
+
+    return data_response  # FastAPI akan otomatis menangani serialisasi ke JSON
