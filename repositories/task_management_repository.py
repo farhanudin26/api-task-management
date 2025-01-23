@@ -99,4 +99,4 @@ class TaskManagementRepository:
 
     
     def read_task_management_by_user_id(self, user_id: str):
-        return self.db.query(TaskManagement).filter(TaskManagement.user_id == user_id).first()
+        return self.db.query(TaskManagement).filter(TaskManagement.user_id == user_id).first() 

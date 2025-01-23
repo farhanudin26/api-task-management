@@ -1,7 +1,10 @@
 import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Enum, Integer, String, DateTime, ForeignKey, Boolean, func
+from constant import UserGender
 from database import Base
+from models.task_management import TaskManagement
+from models.diary import Diary
 
 class User(Base):
     __tablename__ = "users"
@@ -14,7 +17,7 @@ class User(Base):
     password = Column(String(512), nullable=False)
     is_active = Column(Boolean)
     image_url = Column(String(512), unique=False, nullable=True)
-    gender = Column(Enum('male', 'female'), nullable=True)  
+    gender = Column(Enum(UserGender), nullable=True)
     last_login_at = Column(DateTime, nullable=True)      
     created_at = Column(DateTime, server_default=func.NOW(), nullable=False)
     updated_at = Column(DateTime, server_default=func.NOW(), onupdate=func.NOW(), nullable=False)

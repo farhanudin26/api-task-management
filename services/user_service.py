@@ -67,6 +67,7 @@ class UserService:
 
     def update_user(
             self, 
+            
             exist_user: User, 
             user: User, 
             ):
@@ -76,6 +77,8 @@ class UserService:
             exist_user.username = user.username
         
         exist_user.role_id = user.role_id
+        exist_user.name  = user.name 
+        exist_user.gender  = user.gender 
         exist_user.is_active = user.is_active
 
         if user.password:

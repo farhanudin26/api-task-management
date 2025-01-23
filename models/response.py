@@ -1,6 +1,7 @@
 from typing import Union
 from typing import Optional
 from pydantic import BaseModel
+from sqlalchemy import Enum
 
 class BaseResponse(BaseModel):
     code: int = 200
